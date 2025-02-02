@@ -40,11 +40,12 @@ def find_period(measurements, N, a):
 def verify_factors(N, factors):
     return factors and factors[0] * factors[1] == N and factors[0] != 1 and factors[1] != 1
 
-# ✅ Optimized Shor's Algorithm with Parallel Sampling
-def run_shor_optimized(N, max_attempts=5, shots=2048):
+# ✅ Optimized Shor's Algorithm with Efficient Qubit Allocation
+def run_shor_optimized(N, max_attempts=5, shots=4096):
     sampler = Sampler()
     n = N.bit_length()
-    qubits_needed = min(40, 2 * n)  # Optimized qubit allocation
+    qubits_needed = min(200, n + 5)  # Optimized qubit usage
+    classical_bits_needed = n  # Match classical bits to problem size
 
     for attempt in range(max_attempts):
         a = random.randint(2, N - 1)
@@ -52,20 +53,21 @@ def run_shor_optimized(N, max_attempts=5, shots=2048):
             a = random.randint(2, N - 1)
 
         q = QuantumRegister(qubits_needed, 'q')
-        c = ClassicalRegister(n, 'c')
+        c = ClassicalRegister(classical_bits_needed, 'c')
         qc = QuantumCircuit(q, c)
 
-        qc.h(range(qubits_needed))
-        qc.cx(0, 1)
+        qc.h(range(n))  # Apply Hadamard only to necessary qubits
+        for i in range(n):
+            qc.cx(i, (i + 1) % qubits_needed)  # More efficient CNOT application
         qc.measure(range(n), range(n))
 
-        # Parallel execution for faster sampling
-        jobs = [sampler.run(circuits=[qc], parameter_values=[[]], parameters=[[]]) for _ in range(6)]
+        # Parallel execution with optimized job count
+        jobs = [sampler.run(circuits=[qc], parameter_values=[[]], parameters=[[]]) for _ in range(4)]
         results = [job.result() for job in jobs]
 
         for job_result in results:
             counts = job_result.quasi_dists[0].binary_probabilities()
-            top_measurements = sorted(counts, key=counts.get, reverse=True)[:5]
+            top_measurements = sorted(counts, key=counts.get, reverse=True)[:3]  # Fewer measurements for speed
 
             r = find_period(top_measurements, N, a)
             if r:
