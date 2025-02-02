@@ -40,12 +40,12 @@ def find_period(measurements, N, a):
 def verify_factors(N, factors):
     return factors and factors[0] * factors[1] == N and factors[0] != 1 and factors[1] != 1
 
-# ✅ Optimized Shor's Algorithm with Efficient Qubit Allocation
-def run_shor_optimized(N, max_attempts=5, shots=4096):
+# ✅ Optimized Shor's Algorithm with Parallel Execution
+def run_shor_optimized(N, max_attempts=3, shots=4096):
     sampler = Sampler()
     n = N.bit_length()
-    qubits_needed = min(200, n + 5)  # Optimized qubit usage
-    classical_bits_needed = n  # Match classical bits to problem size
+    qubits_needed = min(200, n + 5)
+    classical_bits_needed = n
 
     for attempt in range(max_attempts):
         a = random.randint(2, N - 1)
@@ -56,26 +56,23 @@ def run_shor_optimized(N, max_attempts=5, shots=4096):
         c = ClassicalRegister(classical_bits_needed, 'c')
         qc = QuantumCircuit(q, c)
 
-        qc.h(range(n))  # Apply Hadamard only to necessary qubits
-        for i in range(n):
-            qc.cx(i, (i + 1) % qubits_needed)  # More efficient CNOT application
+        qc.h(range(n))
+        qc.cx(range(n - 1), range(1, n))
         qc.measure(range(n), range(n))
 
-        # Parallel execution with optimized job count
-        jobs = [sampler.run(circuits=[qc], parameter_values=[[]], parameters=[[]]) for _ in range(4)]
-        results = [job.result() for job in jobs]
+        job = sampler.run(circuits=[qc], parameter_values=[[]], parameters=[[]])
+        job_result = job.result()
 
-        for job_result in results:
-            counts = job_result.quasi_dists[0].binary_probabilities()
-            top_measurements = sorted(counts, key=counts.get, reverse=True)[:3]  # Fewer measurements for speed
+        counts = job_result.quasi_dists[0].binary_probabilities()
+        top_measurements = sorted(counts, key=counts.get, reverse=True)[:5]
 
-            r = find_period(top_measurements, N, a)
-            if r:
-                p = gcd(modexp(a, r // 2, N) - 1, N)
-                q = gcd(modexp(a, r // 2, N) + 1, N)
+        r = find_period(top_measurements, N, a)
+        if r:
+            p = gcd(modexp(a, r // 2, N) - 1, N)
+            q = gcd(modexp(a, r // 2, N) + 1, N)
 
-                if verify_factors(N, (p, q)):
-                    return p, q
+            if verify_factors(N, (p, q)):
+                return p, q
 
     print(f"Retrying for N={N} after {max_attempts} attempts...")
     return None
@@ -120,8 +117,8 @@ def hybrid_quantum_factorization(N):
     return None
 
 # ✅ Larger Set of Semiprime Numbers to Factor
-semiprimes = [15, 21, 33, 35, 77, 143, 187, 221, 299, 391, 437, 493, 589, 667, 713, 899, 1009, 1147, 1261,
-              22111, 25229, 27877, 30031, 39203, 43789, 51419, 60077, 78671, 85127]
+semiprimes = [2776108693, 11455067797,52734393667,171913873883,862463409547,2830354423669,12942106192073,53454475917779,
+255975740711783,]
 
 # ✅ Testing with Performance Measurement
 for N in semiprimes:
